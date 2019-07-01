@@ -380,23 +380,46 @@ function update(filter, in_graph) {
 	      prev_clip_end = -1;
 	      fcpxml_offset = 108000; // equivalent of "3600/1s";
 	      var f = meta.file_meta.file_fps.split("/");
+
               var fps = (Number(f[0]) / Number(f[1])).toFixed(2); 	// meta.file_fps expecting format "30000/1001" for 29.97 fps
 	      meta.file_meta.file_fps = f[1] + '/' + f[0];				// flip format into "1001/30000" for fcpxml
+
 	      var n = fps.toString().split(".");
 	      var fps_m = 100;	// fps multiplier
 	      if (n[1] == '00') {
 	         fps_m = 1;
 	      }
-//   console.log('fps:', fps, ' fps_m:',fps_m);
+
+	      // if fps >= 59.94, overwrite as 25
+	      // and grab refactor_multiplier of 60/25 (2.3976),
+	      // will need it to reduce real number values for start_time s
+	      var fps_5994_plus = false;		// 59.94 or similar
+	      if (fps >= 59.94 ) {
+		fps_5994_plus = fps;
+		fps_5994_plus_denom = 25;
+		fps_refactor_m = (fps_5994_plus/ fps_5994_plus_denom).toFixed(4);
+		fps = Math.round(fps);
+		fps_m = 1;
+	      }
+	      var fps_viddfps_ratio = Math.round(fps / _vidd_fps);
+
 	      var sequence_duration = 0;
 	      var fps = fps * fps_m;
-//console.log('org meta.duration:',meta.duration);
-	      //meta.duration = (meta.duration * fps_m).toString() + '/' + fps;
-	      meta.duration = (meta.file_meta.nb_frames * fps_m).toString() + '/' + fps;
 
-	      meta.file_start_time = '0/1';		// default
+	      // grab fcpxml duration from nb_frames
+	      if (meta.file_meta.nb_frames) {
+	      	meta.duration = (meta.file_meta.nb_frames * fps_m).toString() + '/' + fps;
+	      } else {
+		var dur = meta.file_meta.duration;	// in seconds
 
-	      // overwrite file_start_frame from timecode if it's there
+		// 2 statements below may be specific to fps = 59.94
+		var dur_frame = Math.round((Number(meta.file_meta.duration) * fps_5994_plus) / fps_refactor_m);
+	      	meta.duration = dur_frame.toString() + '/' + fps_5994_plus_denom;
+	      }
+
+	      meta.file_start_time = '0/1';		// default asset start_time
+
+	      // overwrite asset start_frame from timecode if it's there
 	      var start_frame = 0;
 	      if ("file_timecode" in meta.file_meta) {
 	    	var t = meta.file_meta.file_timecode.toString().split(":");
@@ -406,7 +429,6 @@ function update(filter, in_graph) {
 		start_frame = hr + min + sec + Number(t[3]);
 	    	meta.file_start_time = (start_frame * fps_m).toString() + '/' + fps;
  	      }
-	    
 
 	      select_str_fcpxml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE fcpxml>
@@ -442,7 +464,11 @@ function update(filter, in_graph) {
 		fcpxml = `
 <!-- start__SEGMENT -->
                         <clip tcFormat="NDF" name="_SEGMENT-_ORG_FN_DECODED" duration="_SEGMENT_DURATION/_ORG_FPSs" enabled="1" offset="_SEGMENT_OFFSET/_VIDD_FPSs" format="r1" start="_SEGMENT_START/_ORG_FPSs">
-                            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
+`;
+		if (fps_5994_plus) {
+                   fcpxml += `            <conform-rate srcFrameRate="SRC_FPS"/>`;
+		}
+                fcpxml += `            <adjust-transform anchor="0 0" position="0 0" scale="1 1"/>
                             <video duration="_ORG_DURATIONs" ref="r2" offset="0/1s" start="0/1s">
                                 <audio lane="-1" duration="_ORG_DURATIONs" ref="r2" srcCh="1, 2" offset="0/1s" start="0/1s"/>
                             </video>
@@ -451,11 +477,11 @@ function update(filter, in_graph) {
 `;
 		// replace in this order
 		fcpxml = fcpxml.replace(/_SEGMENT_START/g, (Number(prev_clip_end) + 1) * fps_m );
-		fcpxml = fcpxml.replace(/_SEGMENT_DURATION/g, (all_nodes[nodes[i]].clip_len * fps_m));
+		fcpxml = fcpxml.replace(/_SEGMENT_DURATION/g, (all_nodes[nodes[i]].clip_len * fps_m * fps_viddfps_ratio));
 		fcpxml = fcpxml.replace(/_SEGMENT_OFFSET/g, fcpxml_offset);
 		fcpxml = fcpxml.replace(/_SEGMENT/g, 'seg_' + nodes[i]);
 		fcpxml_offset += all_nodes[nodes[i]].clip_len + 1;
-		sequence_duration += all_nodes[nodes[i]].clip_len * _vidd_fps * fps_m;
+		sequence_duration += all_nodes[nodes[i]].clip_len * _vidd_fps * fps_m * fps_viddfps_ratio;
                 select_str_fcpxml += fcpxml;
 	       } // if (org_meta)
             } // for
@@ -466,6 +492,7 @@ function update(filter, in_graph) {
 	      select_str_fcpxml = select_str_fcpxml.replace(/_VIDD_HEIGHT/g, _vidd_height);
 	      select_str_fcpxml = select_str_fcpxml.replace(/_VIDD_WIDTH/g, _vidd_width);
 	      select_str_fcpxml = select_str_fcpxml.replace(/_FILE_FPS/g, meta.file_meta.file_fps);
+	      select_str_fcpxml = select_str_fcpxml.replace(/SRC_FPS/g, fps_5994_plus);
 	      select_str_fcpxml = select_str_fcpxml.replace(/_ORG_START_TIME/g, meta.file_start_time);
 	      select_str_fcpxml = select_str_fcpxml.replace(/_ORG_FPS/g, fps);
 	      select_str_fcpxml = select_str_fcpxml.replace(/_ORG_FN_DECODED/g, decodeURIComponent(meta.fn_ext));
