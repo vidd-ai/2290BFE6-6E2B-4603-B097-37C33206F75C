@@ -122,6 +122,12 @@ function update(filter, in_graph) {
         case 'long': graph = in_graph.long;
        	   $('#segFilter').fadeIn().html('Longest ');
            break;
+        case 'longish': graph = in_graph.medium2;
+       	   $('#segFilter').fadeIn().html('Longish ');
+           break;
+        case 'shortish': graph = in_graph.medium1;
+       	   $('#segFilter').fadeIn().html('Shortish ');
+           break;
         case 'selected': graph = in_graph;
        	   $('#segFilter').fadeIn().html('Selected ');
            break;
@@ -285,6 +291,14 @@ function update(filter, in_graph) {
             }
             all_nodes = data["all"].nodes;
             //console.log('all_nodes:',all_nodes);
+            // show longish button if json entry
+            if ("medium2" in data) {
+		$('#longish').show();
+	    }
+            if ("medium1" in data) {
+		$('#shortish').show();
+	    }
+ 
         })
 
         $.getJSON(meta_fn, function (data) {
@@ -304,8 +318,17 @@ function update(filter, in_graph) {
        	$('#fileSummary').fadeIn().html('segments in ' + cat_or_file + ": " + fn + "<br/>");
        	//$('#summaryPage').fadeIn().html('VIDD ' + cat_or_file + " map");
 
+ 
        	$('#long').on('click', function () {
                 update('long', in_graph);
+            });
+
+       	$('#longish').on('click', function () {
+                update('longish', in_graph);
+            });
+
+       	$('#shortish').on('click', function () {
+                update('shortish', in_graph);
             });
 
        	$('#short').on('click', function () {
@@ -559,6 +582,8 @@ function update(filter, in_graph) {
 -->
     <button id="vary">Suggested segments</button>
     <button id="long">Longest</button>
+    <button id="longish" style="display:none">Longish</button>
+    <button id="shortish" style="display:none">Shortish</button>
     <button id="short">Shortest</button>
     <button id="all">All segments</button>
     &nbsp;&nbsp;&nbsp;
