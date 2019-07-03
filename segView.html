@@ -308,6 +308,10 @@ function update(filter, in_graph) {
                 update('long', in_graph);
             });
 
+       	$('#med').on('click', function () {
+                update('medium', in_graph);
+            });
+
        	$('#short').on('click', function () {
                 update('short', in_graph);
             });
@@ -559,6 +563,7 @@ function update(filter, in_graph) {
 -->
     <button id="vary">Suggested segments</button>
     <button id="long">Longest</button>
+    <button id="med">Medium</button>
     <button id="short">Shortest</button>
     <button id="all">All segments</button>
     &nbsp;&nbsp;&nbsp;
